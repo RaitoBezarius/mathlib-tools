@@ -222,6 +222,16 @@ def touch_oleans(path: Path) -> None:
     for p in path.glob('**/*.olean'):
         os.utime(str(p), (now, now))
 
+def search_for_parent_leanpkg(start_path: Path, root_repo: Path) -> Path:
+    """Start from `start_path` and go up until `root_repo` is reached or a `leanpkg.toml` is found."""
+    while not (start_path / 'leanpkg.toml').exists() and start_path != root_repo:
+        start_path = start_path.parent
+
+    if not (start_path / 'leanpkg.toml').exists():
+        raise InvalidLeanProject('Missing leanpkg.toml')
+
+    return start_path
+
 class LeanProject:
     def __init__(self, repo: Repo, is_dirty: bool, rev: str, directory: Path,
             pkg_config: dict, deps: dict,
@@ -255,6 +265,9 @@ class LeanProject:
         except ValueError:
             rev = ''
         directory = Path(repo.working_dir)
+        if not (directory / 'leanpkg.toml').exists():
+            # Attempt to find a parent leanpkg somewhere.
+            directory = search_for_parent_leanpkg(Path.cwd(), repo.working_dir)
         try:
             config = toml.load(directory/'leanpkg.toml')
         except FileNotFoundError:
